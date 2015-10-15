@@ -24,17 +24,22 @@ import (
 	"unsafe"
 )
 
-const (
-	ReadOnly  int = 0x00000000 // Read-only access
-	WriteOnly int = 0x00000001 // Write-only access (deprecated in V3)
-	ReadWrite int = 0x00000002 // Read and write access
+// Available flags given to "open"
+var (
+	ReadWrite = C.MDBM_O_RDWR   // Read-write access
+	WriteOnly = C.MDBM_O_WRONLY // Write-only access (deprecated in V3)
+	ReadOnly  = C.MDBM_O_RDONLY // Read-only access
+	Truncate  = C.MDBM_O_TRUNC  // Truncate file
+	Create    = C.MDBM_O_CREAT  // Create file if it does not exist
+	Async     = C.MDBM_O_ASYNC  // Asynchronous writes
+	Fsync     = C.MDBM_O_FSYNC  // Sync file on close
 
-	DirectIO int = 0x00004000 // Perform direction I/O
+	DirectIO = C.MDBM_O_DIRECT // Perform direction I/O
 
-	LockAny       int = 0x00020000 // Open, even if existing locks don't match flags
-	LockPartition int = 0x02000000 // Partitioned locks
-	LockReadWrite int = 0x08000000 // Read-write locks
-	LockNone      int = 0x80000000 // Don't lock during open
+	LockAny       = C.MDBM_ANY_LOCKS         // Open, even if existing locks don't match flags
+	LockPartition = C.MDBM_PARTITIONED_LOCKS // Partitioned locks
+	LockReadWrite = C.MDBM_RW_LOCKS          // Read-write locks
+	LockNone      = C.MDBM_OPEN_NOLOCK       // Don't lock during open
 )
 
 type MDBM struct {
@@ -47,25 +52,14 @@ type MDBM struct {
 	mutex sync.Mutex
 }
 
-type Option func(*MDBM)
-
-/*
-
-db, err := mdbm.Open("my.mdbm")
-...
-
-
-flags := mdbm.ReadWrite | mdbm.Create | mdbm.Truncate
-db, err := mdbm.Open("my.mdbm", mdbm.Flags(flags), mdbm.Perms(0600), mdbm.PageSize(512), mdbm.StartSize(1024))
-...
-
-*/
+type option func(*MDBM)
 
 func (db *MDBM) setFlags(flags int) {
 	db.flags = flags
 }
 
-func Flags(flags int) Option {
+// Bitwise flags to open a DB
+func Flags(flags int) option {
 	return func(db *MDBM) {
 		db.setFlags(flags)
 	}
@@ -75,7 +69,8 @@ func (db *MDBM) setPerms(perms int) {
 	db.perms = perms
 }
 
-func Perms(perms int) Option {
+// Permissions to open/create a new DB
+func Perms(perms int) option {
 	return func(db *MDBM) {
 		db.setPerms(perms)
 	}
@@ -85,7 +80,8 @@ func (db *MDBM) setPageSize(size int) {
 	db.psize = size
 }
 
-func PageSize(size int) Option {
+// Page size in KB
+func PageSize(size int) option {
 	return func(db *MDBM) {
 		db.setPageSize(size)
 	}
@@ -95,21 +91,16 @@ func (db *MDBM) setStartSize(size int) {
 	db.dsize = size
 }
 
-func StartSize(size int) Option {
+// Starting size in KB for a new DB
+func StartSize(size int) option {
 	return func(db *MDBM) {
 		db.setStartSize(size)
 	}
 }
 
-// db, err := mdbm.Open("my.mdbm")
-// ...
-//
-//
-// flags := mdbm.ReadWrite | mdbm.Create | mdbm.Truncate
-// db, err := mdbm.Open("my.mdbm", mdbm.Flags(flags), mdbm.Perms(0600), mdbm.PageSize(512), mdbm.StartSize(1024))
-// ...
-//
-func Open(dbfile string, options ...Option) (db *MDBM, err error) {
+// Open an existing DB or create a new DB
+// Default flags are: ReadWrite | Create
+func Open(dbfile string, options ...option) (db *MDBM, err error) {
 	db = &MDBM{
 		flags: ReadWrite | Create,
 		perms: 0666,
@@ -132,7 +123,8 @@ func Open(dbfile string, options ...Option) (db *MDBM, err error) {
 	return db, nil
 }
 
-func (db *MDBM) Dup(options ...Option) (dup *MDBM, err error) {
+// Duping an existing  DB handle
+func (db *MDBM) Dup(options ...option) (dup *MDBM, err error) {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
@@ -152,10 +144,12 @@ func (db *MDBM) Dup(options ...Option) (dup *MDBM, err error) {
 	return dup, nil
 }
 
+// Close a DB
 func (db *MDBM) Close() {
 	C.mdbm_close(db.dbh)
 }
 
+// Get a value for a given key
 func (db *MDBM) Get(key []byte) (val []byte, err error) {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
@@ -174,6 +168,7 @@ func (db *MDBM) Get(key []byte) (val []byte, err error) {
 	return C.GoBytes(unsafe.Pointer(v.dptr), v.dsize), nil
 }
 
+// Save an entry to a DB given a pair of key and value
 func (db *MDBM) Put(key []byte, val []byte) error {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
@@ -195,6 +190,7 @@ func (db *MDBM) Put(key []byte, val []byte) error {
 	return nil
 }
 
+// Delete an entry from a DB given a key
 func (db *MDBM) Delete(key []byte) error {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
@@ -214,6 +210,7 @@ func (db *MDBM) Delete(key []byte) error {
 	return nil
 }
 
+// Lock DB exclusively
 func (db *MDBM) Lock() error {
 	if !db.hasLock {
 		_, e := C.mdbm_lock(db.dbh)
@@ -226,6 +223,7 @@ func (db *MDBM) Lock() error {
 	return nil
 }
 
+// Unlock DB
 func (db *MDBM) Unlock() error {
 	if db.hasLock {
 		_, e := C.mdbm_unlock(db.dbh)
@@ -238,10 +236,12 @@ func (db *MDBM) Unlock() error {
 	return nil
 }
 
+// Restart DB iterator
 func (db *MDBM) Restart() {
 	C.mdbm_iter_init(&db.iter)
 }
 
+// Fetch an entry from DB using iterator
 func (db *MDBM) Fetch() bool {
 	db.Lock()
 	db.entry = C.mdbm_next_r(db.dbh, &db.iter)
@@ -252,6 +252,7 @@ func (db *MDBM) Fetch() bool {
 	return false
 }
 
+// Return last fetched entry using iterator
 func (db *MDBM) Entry() (key []byte, val []byte) {
 	k := db.entry.key
 	v := db.entry.val
