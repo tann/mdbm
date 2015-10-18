@@ -98,8 +98,12 @@ func StartSize(size int) option {
 	}
 }
 
-// Open opens an existing DB or creates a new DB.
-// (Defaults are mdbm.ReadWrite | mdbm.Create)
+// Open opens an existing DB or creates a new DB. Options can be passed in
+// using these setters:
+//	mdbm.Flags. Default to mdbm.Flags(mdbm.ReadWrite | mdbm.Create)
+//	mdbm.Perms. Default to mdbm.Perms(0600)
+//	mdbm.PageSize. Default to 4Kb (4096)
+//	mdbm.StartSize. Default to 1Mb
 func Open(dbfile string, options ...option) (db *MDBM, err error) {
 	db = &MDBM{
 		flags: ReadWrite | Create,
