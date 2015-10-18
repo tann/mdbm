@@ -40,7 +40,7 @@ func Example() {
 	}
 }
 
-func Example_Open() {
+func ExampleMDBM_Open() {
 	// Open with user-defined options
 	flags := mdbm.ReadWrite | mdbm.Truncate | mdbm.Create
 	db, err := mdbm.Open("my.db", mdbm.Flags(flags), mdbm.Perms(0666))
