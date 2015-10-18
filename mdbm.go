@@ -19,7 +19,6 @@ import "C"
 
 import (
 	"errors"
-	"log"
 	"sync"
 	"unsafe"
 )
@@ -221,7 +220,6 @@ func (db *MDBM) Lock() error {
 		if e != nil {
 			return e
 		}
-		log.Println("Got lock!")
 		db.hasLock = true
 	}
 	return nil
@@ -234,7 +232,6 @@ func (db *MDBM) Unlock() error {
 		if e != nil {
 			return e
 		}
-		log.Println("Released lock!")
 		db.hasLock = false
 	}
 	return nil
