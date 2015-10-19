@@ -127,7 +127,7 @@ func Open(dbfile string, options ...option) (db *MDBM, err error) {
 }
 
 // Dup duplicates an existing DB handle
-func (db *MDBM) Dup(options ...option) (dup *MDBM, err error) {
+func (db *MDBM) Dup() (dup *MDBM, err error) {
 	db.mutex.Lock()
 	defer db.mutex.Unlock()
 
